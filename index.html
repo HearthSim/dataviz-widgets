@@ -20,7 +20,7 @@
         display: inline-block;
       }
 
-      .toggleview {
+      .toggleview, .togglearchetype {
         background: #777;
         padding: 15px;
         font-size: 16px;
@@ -36,11 +36,11 @@
         cursor: pointer;
       }
 
-      .toggleview:hover{
+      .toggleview:hover, .togglearchetype:hover{
         box-shadow: #222 2px 2px 5px;
       }
 
-      .toggleview:active {
+      .toggleview:active, .togglearchetype:active {
         box-shadow: #000 1px 1px 1px;
       }
 
@@ -74,6 +74,7 @@
 
       <div class="deckinfo"><div class="title">Selected Deck:</div></div>
       <div class="toggleview">Chart by class</div>
+      <!-- <div class="togglearchetype">Chart by archetype</div> -->
     </div>
 
     <div id="legend" style="width:500px;margin-left:50px;">
@@ -81,6 +82,9 @@
     </div>
 
     <script>
+
+    window.day = 0;
+
 
     var class_enum = [
       {name: 'DRUID', color: '#ff7d0a'},
@@ -95,7 +99,62 @@
     ]
 
 
-    d3.csv('top_decks_24_hours.csv', function(data){
+    d3.csv('top_decks_over_time_data.csv', function(raw){
+      var days = d3.nest()
+        .key(function (d) { return d.day })
+        .rollup(function (d) {
+          return d;
+        })
+        .entries(raw);
+
+      console.log('DATA', days);
+
+      render(days, raw);
+
+      var cancel = setInterval(function () {
+        window.day += 1;
+        if (window.day < 15) {
+          render(days, raw);
+        } else {
+          clearInterval(cancel);
+          window.day = 14;
+        }
+      }, 3500)
+
+
+      d3.select('.toggleview').on('click', function () {
+        d3.select('.deckinfo')
+          .classed('open', false)
+          .transition()
+          .duration(350)
+          .style("height", '0px')
+
+        if (window.viewByClass) {
+          d3.select(this).text('Chart by class')
+        } else {
+          d3.select(this).text('Chart by deck')
+        }
+        window.viewByClass = !window.viewByClass;
+        render(days, raw)
+      })
+    })
+
+      d3.select('.togglearchetype').on('click', function () {
+        window.archetype = !window.archetype;
+
+        if (window.archetype) {
+          d3.select(this).text('Chart by specific deck')
+        } else {
+          d3.select(this).text('Chart by archetype')
+        }
+
+        render(days, raw)
+    })
+
+    function render(days, raw){
+      data = days[window.day].value
+
+
       var summary = d3.nest()
          .key(function(d) { return d.player_class;})
          .rollup(function(d) {
@@ -112,33 +171,49 @@
           return d;
         });
 
-      render(data, summary);
+      var summaryRaw = d3.nest()
+         .key(function(d) { return d.day;})
+         .key(function(d) { return d.player_class;})
+         .rollup(function(d) {
 
+           return {match_count: d3.sum(d, function(g) {return g.match_count; }), win_rate: (d3.sum(d, function(g) {return (+g.win_rate) * (+g.match_count); }) / d3.sum(d, function(g) {return +g.match_count}))};
 
-      d3.select('.toggleview').on('click', function () {
-        d3.select('.deckinfo')
-          .classed('open', false)
-          .transition()
-          .duration(350)
-          .style("height", '0px')
+        }).entries(raw).map(function (d) {
+          d.match_count_max = d3.max(d.values, function (d) { return +d.value.match_count });
+          d.match_count_min = d3.min(d.values, function (d) { return +d.value.match_count });
+          d.win_rate_max = d3.max(d.values, function (d) { return +d.value.win_rate });
+          d.win_rate_min = d3.min(d.values, function (d) { return +d.value.win_rate });
 
-        if (window.viewByClass) {
-          d3.select(this).text('Chart by class')
-        } else {
-          d3.select(this).text('Chart by deck')
+          return d;
+        });
+
+      var byArchetype = d3.nest()
+         .key(function(d) { return d.archetype;})
+         .rollup(function(d) {
+
+          return {player_class: d[0].player_class, match_count: d3.sum(d, function(g) {return g.match_count; }), win_rate: (d3.sum(d, function(g) {return (+g.win_rate) * (+g.match_count); }) / d3.sum(d, function(g) {return +g.match_count}))};
+        }).entries(data).map(function (d) {
+          d.match_count = d.value.match_count;
+          d.win_rate = d.value.win_rate;
+          d.player_class = d.value.player_class;
+          d.deck_id = d.key;
+
+          delete d['key'];
+          delete d['value'];
+
+          return d;
+        });
+
+        if (window.archetype) {
+          data = byArchetype;
         }
-        window.viewByClass = !window.viewByClass;
-        render(data, summary)
-      })
-    })
 
-    function render(data, summary){
-      var x = d3.scaleLog().domain(d3.extent(data, function(d) { return +d.match_count })).range([64, 536])
-      var y = d3.scaleLinear().domain([d3.max(data, function(d) { return +d.win_rate }), d3.min(data, function(d) { return +d.win_rate })]).range([64, 536])
+      var x = d3.scaleLog().domain(d3.extent(raw, function(d) { return +d.match_count })).range([64, 536])
+      var y = d3.scaleLinear().domain([d3.max(raw, function(d) { return +d.win_rate }), d3.min(raw, function(d) { return +d.win_rate })]).range([64, 536])
       // var x2 = x
       // var y2 = y
-      var x2 = d3.scaleLog().domain(d3.extent(summary, function(d) { return +d.match_count })).range([64, 536])
-      var y2 = d3.scaleLinear().domain([d3.max(summary, function(d) { return +d.win_rate }), d3.min(summary, function(d) { return +d.win_rate })]).range([64, 536])
+      var x2 = d3.scaleLog().domain([d3.min(summaryRaw, function(d) { return +d.match_count_min }), d3.max(summaryRaw, function(d) { return +d.match_count_max })]).range([64, 536])
+      var y2 = d3.scaleLinear().domain([d3.max(summaryRaw, function(d) { return +d.win_rate_max }), d3.min(summaryRaw, function(d) { return +d.win_rate_min })]).range([64, 536])
 
       window.useY = y;
       window.useX = x;
@@ -183,9 +258,9 @@
         .append('line')
         .classed('fiveHundred', true)
         .attr("x1", 0)
-        .attr("y1", useY(0.5))
+        .attr("y1", useY(50))
         .attr("x2", 600)
-        .attr("y2", useY(0.5))
+        .attr("y2", useY(50))
         .style("stroke-width", 2)
         .style("stroke", "#444")
 
@@ -195,22 +270,41 @@
         .transition()
         .duration(1000)
         .attr("x1", 0)
-        .attr("y1", useY(0.5))
+        .attr("y1", useY(50))
         .attr("x2", 600)
-        .attr("y2", useY(0.5))
+        .attr("y2", useY(50))
         .style("stroke-width", 2)
         .style("stroke", "#444")
 
+      d3.select("#chart")
+        .style('border', '3px solid #444')
+        .selectAll('circle.mark')
+        .data(data, function (d) { return d.deck_id; })        .exit()
+        .transition()
+        .delay(0)
+        .duration(500)
+        .ease(d3.easeCubicInOut)
+        .attr("r", 0)
+        .remove()
+
+
       var deckMarks = d3.select("#chart")
-      .style('border', '3px solid #444')
-      .selectAll('circle.mark')
-      .data(data)
-      .enter()
-      .append('circle')
-      .classed('mark', true)
+        .style('border', '3px solid #444')
+        .selectAll('circle.mark')
+        .data(data, function (d) { return d.deck_id; })
+        .enter()
+        .append('circle')
+        .classed('mark', true)
+        .attr("r", 0)
+
+      deckMarks
+        .transition()
+        .duration(500)
+        .attr("r", 3)
+
+      deckMarks
       .style("fill", function (d) { return class_enum[(+d.player_class) - 2].color })
       .style("cursor", 'pointer')
-      .attr("r", 3)
       .attr("data-class", function (d) { return d.player_class })
       .attr("cx", function(d) { return x(d.match_count) })
       .attr("cy", function(d) { return y(d.win_rate) })
@@ -241,21 +335,23 @@
       if (window.viewByClass) {
         d3.select("#chart")
         .selectAll('circle.mark')
-        .data(data)
+        .data(data, function (d) { return d.deck_id; })
         .transition()
         .delay(0)
         .duration(1500)
         .ease(d3.easeCubicInOut)
+        .attr("r", 0)
         .attr("cx", function(d) { return x2(summary.find(function (x) {return x.player_class === d.player_class}).match_count) })
         .attr("cy", function(d) { return y2(summary.find(function (x) {return x.player_class === d.player_class}).win_rate) })
       } else {
         d3.select("#chart")
         .selectAll('circle.mark')
-        .data(data)
+        .data(data, function (d) { return d.deck_id; })
         .transition()
         .delay(0)
         .duration(1500)
         .ease(d3.easeCubicInOut)
+        .attr("r", 3)
         .attr("cx", function(d) { return x(d.match_count) })
         .attr("cy", function(d) { return y(d.win_rate) })
       }
@@ -263,12 +359,11 @@
       var classMarks = d3.select("#chart")
       .style('border', '3px solid #444')
       .selectAll('image.mark')
-      .data(summary)
+      .data(summary, function (d) { return d.player_class })
       .enter()
       .append('image')
       .style('opacity', 0)
       .classed('mark', true)
-      // .style("fill", function (d) { return class_enum[(+d.player_class) - 2].color })
       .attr('xlink:href', function (d) {
         var i = (+d.player_class) - 2;
 
@@ -279,34 +374,36 @@
         return '/img/icons/Icon_'+name+'_64.png'
       })
       .attr("x", function(d) { return x2(d.match_count) - 16 })
-      .attr("y", function(d) { return useY(d.win_rate) - 16 })
+      .attr("y", function(d) { return y2(d.win_rate) - 16 })
       .attr('height', '32px')
       .attr('width', '32px')
       .style("cursor", 'pointer')
       .attr("data-class", function (d) { return d.player_class })
-      .on('mouseover', function (d, i) {
-        d3.select(this).transition().duration(250).attr("width", '64px').attr("height", '64px').attr("x", x2(d.match_count) - 32).attr("y", useY(d.win_rate) - 32)
-
-      })
-      .on('mouseout', function (d, i) {
-        d3.select(this).transition().duration(250).attr("width", '32px').attr("height", '32px').attr("x", x2(d.match_count) - 16).attr("y", useY(d.win_rate) - 16)
-      })
+      // .on('mouseover', function (d, i) {
+      //   d3.select(this).transition().duration(250).attr("width", '64px').attr("height", '64px').attr("x", x2(d.match_count) - 32).attr("y", y2(d.win_rate) - 32)
+      //
+      // })
+      // .on('mouseout', function (d, i) {
+      //   d3.select(this).transition().duration(250).attr("width", '32px').attr("height", '32px').attr("x", x2(d.match_count) - 16).attr("y", y2(d.win_rate) - 16)
+      // })
 
     var classMarks = d3.select("#chart")
       .selectAll('image.mark')
-      .data(summary)
+      .data(summary, function (d) { return d.player_class })
       .transition()
       .delay(window.viewByClass? 1000 : 500)
-      .duration(0)
+      .duration(1500)
       .attr("x", function(d) { return x2(d.match_count) - 16 })
-      .attr("y", function(d) { return useY(d.win_rate) - 16 })
+      .attr("y", function(d) { return y2(d.win_rate) - 16 })
 
     var classMarks = d3.select("#chart")
       .selectAll('image.mark')
-      .data(summary)
+      .data(summary, function (d) { return d.player_class })
       .transition()
       .delay(window.viewByClass? 1000 : 0)
       .duration(500)
+      .attr("x", function(d) { return x2(d.match_count) - 16 })
+      .attr("y", function(d) { return y2(d.win_rate) - 16 })
       .style('opacity', function() {
         if (window.viewByClass) {
           return 1
