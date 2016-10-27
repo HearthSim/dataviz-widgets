@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html class="new">
   <head>
     <meta charset="utf-8">
     <title></title>
@@ -16,12 +16,27 @@
         box-sizing: border-box;
       }
 
+      html.new .play_pause {
+        box-shadow: yellow 0 0 10px;
+      }
+
       svg {
         display: inline-block;
       }
 
       html:not(.paused) .back, html:not(.paused) .forward {
-        opacity: 0;
+        opacity: 0.1;
+        pointer-events: none;
+      }
+
+      .day0 .back {
+        opacity: 0.1;
+        pointer-events: none;
+      }
+
+      .day14 .forward, .day14 .play_pause {
+        opacity: 0.1;
+        pointer-events: none;
       }
 
       .controls {
@@ -48,9 +63,6 @@
         transition: all 0.5s;
 
         margin: 5px;
-
-        /*float: left;*/
-
         cursor: pointer;
       }
 
@@ -140,6 +152,8 @@
 
     <script>
 
+    window.paused = true;
+
     const dayScale = d3.scaleLinear()
       .domain([new Date('10/11/2016'), new Date('10/25/2016')])
       .range([0, 595])
@@ -148,6 +162,8 @@
 
     function togglePause () {
       window.paused = !window.paused;
+      d3.select('html')
+        .classed('new', false);
 
       d3.select('html')
         .classed('paused', window.paused);
@@ -207,8 +223,9 @@
           render(days, raw);
         } else {
           render(days, raw);
-          clearInterval(cancel);
+          // clearInterval(cancel);
           togglePause();
+          window.day = 14;
         }
       }, 3500)
 
@@ -235,6 +252,7 @@
 
         d3.select('.prog')
           .style('width', dayScale(new Date('10/' + (window.day + 11) + '/2016'))+'px')
+
 
         render(days, raw);
       })
@@ -272,6 +290,15 @@
     })
 
     function render(days, raw){
+      if (window.paused) {
+        d3.select('.play_pause').text('Play')
+      } else {
+        d3.select('.play_pause').text('Pause')
+      }
+
+      d3.select('body')
+        .attr('class', 'day' + window.day);
+
       d3.select('.date')
         .text(function () {
           return '10/' + (window.day + 11) + '/2016';
