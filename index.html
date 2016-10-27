@@ -20,7 +20,23 @@
         display: inline-block;
       }
 
-      .toggleview, .togglearchetype {
+      html:not(.paused) .back, html:not(.paused) .forward {
+        opacity: 0;
+      }
+
+      .controls {
+        display: -webkit-flex;
+        display: -moz-flex;
+        display: -ms-flex;
+        display: -o-flex;
+        display: flex;
+
+        width: 600px;
+
+        justify-content: space-between;
+      }
+
+      .button, .togglearchetype {
         background: #777;
         padding: 15px;
         font-size: 16px;
@@ -31,16 +47,18 @@
         -o-transition: all 0.5s;
         transition: all 0.5s;
 
+        margin: 5px;
+
         /*float: left;*/
 
         cursor: pointer;
       }
 
-      .toggleview:hover, .togglearchetype:hover{
+      .button:hover, .togglearchetype:hover{
         box-shadow: #222 2px 2px 5px;
       }
 
-      .toggleview:active, .togglearchetype:active {
+      .button:active, .togglearchetype:active {
         box-shadow: #000 1px 1px 1px;
       }
 
@@ -64,26 +82,84 @@
 
       .deckinfo.open {
       }
+
+      .progress_bar {
+        border: 3px solid #444;
+        width: 600px;
+        margin: 5px;
+        margin-left: 0;
+        position: relative;
+      }
+
+      .prog {
+        height: 100%;
+        background: #444;
+        width: 0;
+        transition: all 3.5s;
+        position: absolute;
+        z-index: -1;
+      }
+
+      .title.main {
+        width: 600px;
+        text-align: center;
+        font-style: 1.25rem;
+        padding-top: 10px;
+        padding-bottom: 10px;
+        color: #DDD;
+      }
     </style>
   </head>
   <body style="background: #333;">
+    <div class="controls">
+      <div class="back button">Back 1 Day</div>
+      <div class="play_pause button">Pause</div>
+      <div class="toggleview button">Chart by class</div>
+      <div class="forward button">Forward 1 Day</div>
+    </div>
+    <div class="progress_bar">
+      <div class="prog"></div>
+
+      <div class="main title">
+        The Metagame as of <span class="date"></span>
+      </div>
+    </div>
     <div>
-      <svg id="chart" width="600" height="600">
+      <svg id="chart" width="600" height="500">
 
       </svg>
 
       <div class="deckinfo"><div class="title">Selected Deck:</div></div>
-      <div class="toggleview">Chart by class</div>
+
       <!-- <div class="togglearchetype">Chart by archetype</div> -->
     </div>
 
-    <div id="legend" style="width:500px;margin-left:50px;">
+    <div id="legend" style="width:500px;margin-left:50px;margin-top: 15px;">
 
     </div>
 
     <script>
 
+    const dayScale = d3.scaleLinear()
+      .domain([new Date('10/11/2016'), new Date('10/25/2016')])
+      .range([0, 595])
+
     window.day = 0;
+
+    function togglePause () {
+      window.paused = !window.paused;
+
+      d3.select('html')
+        .classed('paused', window.paused);
+
+      if (window.paused) {
+        d3.select(this).text('Play')
+      } else {
+        d3.select(this).text('Pause')
+      }
+    }
+
+    d3.select('.play_pause').on('click', togglePause)
 
 
     var class_enum = [
@@ -111,15 +187,57 @@
 
       render(days, raw);
 
+
+      d3.select('.prog')
+        .style('width', dayScale(new Date('10/' + (window.day + 11) + '/2016'))+'px')
+
       var cancel = setInterval(function () {
+        if (window.paused) {
+          return;
+        }
+
         window.day += 1;
-        if (window.day < 15) {
+
+        // console.log('Window', (window.day * (600 / 14))+'px')
+
+        d3.select('.prog')
+          .style('width', dayScale(new Date('10/' + (window.day + 11) + '/2016'))+'px')
+
+        if (window.day < 14) {
           render(days, raw);
         } else {
+          render(days, raw);
           clearInterval(cancel);
-          window.day = 14;
+          togglePause();
         }
       }, 3500)
+
+
+      d3.select('.back').on('click', function () {
+        if (window.day < 1) {
+          return;
+        }
+
+        window.day -= 1;
+
+        d3.select('.prog')
+          .style('width', dayScale(new Date('10/' + (window.day + 11) + '/2016'))+'px')
+
+        render(days, raw);
+      })
+
+      d3.select('.forward').on('click', function () {
+        if (window.day > 13) {
+          return;
+        }
+
+        window.day += 1;
+
+        d3.select('.prog')
+          .style('width', dayScale(new Date('10/' + (window.day + 11) + '/2016'))+'px')
+
+        render(days, raw);
+      })
 
 
       d3.select('.toggleview').on('click', function () {
@@ -128,6 +246,8 @@
           .transition()
           .duration(350)
           .style("height", '0px')
+
+        window.selectedDeck = undefined;
 
         if (window.viewByClass) {
           d3.select(this).text('Chart by class')
@@ -152,6 +272,11 @@
     })
 
     function render(days, raw){
+      d3.select('.date')
+        .text(function () {
+          return '10/' + (window.day + 11) + '/2016';
+        })
+
       data = days[window.day].value
 
 
@@ -209,11 +334,11 @@
         }
 
       var x = d3.scaleLog().domain(d3.extent(raw, function(d) { return +d.match_count })).range([64, 536])
-      var y = d3.scaleLinear().domain([d3.max(raw, function(d) { return +d.win_rate }), d3.min(raw, function(d) { return +d.win_rate })]).range([64, 536])
+      var y = d3.scaleLinear().domain([d3.max(raw, function(d) { return +d.win_rate }), d3.min(raw, function(d) { return +d.win_rate })]).range([64, 436])
       // var x2 = x
       // var y2 = y
       var x2 = d3.scaleLog().domain([d3.min(summaryRaw, function(d) { return +d.match_count_min }), d3.max(summaryRaw, function(d) { return +d.match_count_max })]).range([64, 536])
-      var y2 = d3.scaleLinear().domain([d3.max(summaryRaw, function(d) { return +d.win_rate_max }), d3.min(summaryRaw, function(d) { return +d.win_rate_min })]).range([64, 536])
+      var y2 = d3.scaleLinear().domain([d3.max(summaryRaw, function(d) { return +d.win_rate_max }), d3.min(summaryRaw, function(d) { return +d.win_rate_min })]).range([64, 436])
 
       window.useY = y;
       window.useX = x;
@@ -300,7 +425,13 @@
       deckMarks
         .transition()
         .duration(500)
-        .attr("r", 3)
+        .attr("r", function (d) {
+          if (window.selectedDeck === d.deck_id) {
+            return 8
+          } else {
+            return 3
+          }
+        })
 
       deckMarks
       .style("fill", function (d) { return class_enum[(+d.player_class) - 2].color })
@@ -312,10 +443,19 @@
         d3.select(this).transition().duration(250).attr("r", 8)
       })
       .on('mouseout', function (d, i) {
-        d3.select(this).transition().duration(250).attr("r", 3)
+        d3.select(this).transition().duration(250).attr("r", function (d) {
+          if (window.selectedDeck === d.deck_id) {
+            return 8
+          } else {
+            return 3
+          }
+        })
       })
       .on('click', function (d, i) {
-        console.log(d3.select('.deckinfo'))
+        window.selectedDeck = d.deck_id;
+
+        d3.select(this)
+          .attr('r', 8);
 
         d3.select('.deckinfo')
           .classed('open', false)
@@ -351,7 +491,13 @@
         .delay(0)
         .duration(1500)
         .ease(d3.easeCubicInOut)
-        .attr("r", 3)
+        .attr("r", function (d) {
+          if (window.selectedDeck === d.deck_id) {
+            return 8
+          } else {
+            return 3
+          }
+        })
         .attr("cx", function(d) { return x(d.match_count) })
         .attr("cy", function(d) { return y(d.win_rate) })
       }
