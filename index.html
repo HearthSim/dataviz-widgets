@@ -64,6 +64,10 @@
 
       .deckinfo.open {
       }
+
+      .cardBanner {
+        width: 215px;
+      }
     </style>
   </head>
   <body style="background: #333;">
@@ -72,7 +76,7 @@
 
       </svg>
 
-      <div class="deckinfo" id="deckinfo"><div class="title">Selected Deck:</div></div>
+      <div class="deckinfo"><div class="title">Selected Deck:</div></div>
       <div class="toggleview">Chart by class</div>
       <!-- <div class="togglearchetype">Chart by archetype</div> -->
     </div>
@@ -316,7 +320,7 @@
       })
       .on('click', function (d, i) {
         console.log(d3.select('.deckinfo'))
-
+        makeDeckList(d)
         d3.select('.deckinfo')
           .classed('open', false)
           .transition()
