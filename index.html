@@ -16,12 +16,21 @@
         box-sizing: border-box;
       }
 
+      body {
+        padding: 25px;
+      }
+
+      text {
+        font-family: sans-serif;
+      }
+
       html.new .play_pause {
         box-shadow: yellow 0 0 10px;
       }
 
       svg {
         display: inline-block;
+        overflow: visible;
       }
 
       html:not(.paused) .back, html:not(.paused) .forward {
@@ -198,7 +207,11 @@
     </div>
     <div>
       <svg id="chart" width="600" height="450">
-
+        <text x="0" y="460" font-family="sans-serif" font-size="12px" fill="#999" class="x0">0</text>
+        <text x="592" y="460" font-family="sans-serif" font-size="12px" fill="#999" text-anchor="end" class="x1">100</text>
+        <text x="592" y="460" font-family="sans-serif" font-size="12px" fill="#999" text-anchor="end" class="fifty">50% Win Rate</text>
+        <text x="-5" y="442" font-family="sans-serif" font-size="12px" fill="#999" text-anchor="end" class="y0">0</text>
+        <text x="-5" y="10" font-family="sans-serif" font-size="12px" fill="#999" text-anchor="end" class="y1">100</text>
       </svg>
 
       <div class="deckinfo">
@@ -440,11 +453,11 @@
         }
 
       var x = d3.scaleLog().domain(d3.extent(raw, function(d) { return +d.match_count })).range([64, 536])
-      var y = d3.scaleLinear().domain([d3.max(raw, function(d) { return +d.win_rate }), d3.min(raw, function(d) { return +d.win_rate })]).range([64, 386])
+      var y = d3.scaleLinear().domain([d3.max(raw, function(d) { return +d.win_rate }), d3.min(raw, function(d) { return +d.win_rate })]).range([64, 386]).nice()
       // var x2 = x
       // var y2 = y
       var x2 = d3.scaleLog().domain([d3.min(summaryRaw, function(d) { return +d.match_count_min }), d3.max(summaryRaw, function(d) { return +d.match_count_max })]).range([64, 536])
-      var y2 = d3.scaleLinear().domain([d3.max(summaryRaw, function(d) { return +d.win_rate_max }), d3.min(summaryRaw, function(d) { return +d.win_rate_min })]).range([64, 386])
+      var y2 = d3.scaleLinear().domain([d3.max(summaryRaw, function(d) { return +d.win_rate_max }), d3.min(summaryRaw, function(d) { return +d.win_rate_min })]).range([64, 386]).nice()
 
       window.useY = y;
       window.useX = x;
@@ -453,6 +466,31 @@
         window.useY = y2;
         window.useX = x2;
       }
+
+      d3.select('.x0')
+        .text(function (d) {
+          return window.useX.domain()[0]
+        })
+
+      d3.select('.x1')
+        .text(function (d) {
+          return window.useX.domain()[1]
+        })
+
+      d3.select('.y0')
+        .text(function (d) {
+          return window.useY.domain()[1] + '%'
+        })
+
+      d3.select('.y1')
+        .text(function (d) {
+          return window.useY.domain()[0] + '%'
+        })
+
+      d3.select('.fifty')
+        .attr('y', function () {
+          return useY(50) - 5;
+        })
 
       var halfOfDecks = d3.select("#chart")
         .selectAll('line.halfOfDecks')
@@ -490,7 +528,7 @@
         .classed('fiveHundred', true)
         .attr("x1", 0)
         .attr("y1", useY(50))
-        .attr("x2", 600)
+        .attr("x2", 595)
         .attr("y2", useY(50))
         .style("stroke-width", 2)
         .style("stroke", "#444")
@@ -502,7 +540,7 @@
         .duration(1000)
         .attr("x1", 0)
         .attr("y1", useY(50))
-        .attr("x2", 600)
+        .attr("x2", 595)
         .attr("y2", useY(50))
         .style("stroke-width", 2)
         .style("stroke", "#444")
